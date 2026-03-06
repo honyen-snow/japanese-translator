@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🗾 日語旅遊小幫手</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic Pro', 'Microsoft JhengHei', sans-serif;
+      padding: 24px; position: relative; overflow-x: hidden;
+    }
+    body::before { content:''; position:fixed; top:-80px; right:-80px; width:300px; height:300px; border-radius:50%; background:rgba(229,160,13,0.08); pointer-events:none; }
+    body::after  { content:''; position:fixed; bottom:-60px; left:-60px; width:250px; height:250px; border-radius:50%; background:rgba(229,160,13,0.06); pointer-events:none; }
+
+    .card {
+      background: rgba(255,255,255,0.05); backdrop-filter: blur(20px);
+      border: 2px solid rgba(229,160,13,0.4); border-radius: 28px;
+      padding: 40px 40px 48px; max-width: 560px; width: 100%;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+      text-align: center;
+    }
+
+    /* 模式切換 */
+    .mode-switcher { display:flex; justify-content:center; margin-bottom:28px; background:rgba(255,255,255,0.07); border-radius:18px; padding:6px; gap:6px; }
+    .mode-btn { flex:1; padding:14px 8px; border:none; border-radius:13px; font-size:clamp(14px,2.5vw,17px); font-weight:800; cursor:pointer; transition:all 0.3s; font-family:inherit; color:rgba(255,255,255,0.45); background:transparent; }
+    .mode-btn.active-zh { background:linear-gradient(135deg,#FF7A2F,#FF5500); color:#fff; box-shadow:0 4px 18px rgba(255,85,0,0.45); }
+    .mode-btn.active-ja { background:linear-gradient(135deg,#6366f1,#4338ca); color:#fff; box-shadow:0 4px 18px rgba(99,102,241,0.45); }
+    .mode-btn:hover:not(.active-zh):not(.active-ja) { color:rgba(255,255,255,0.75); background:rgba(255,255,255,0.08); }
+
+    /* 輸入區 */
+    .input-section { margin-bottom:28px; padding:28px 24px; background:rgba(255,255,255,0.06); border:1.5px solid rgba(255,255,255,0.15); border-radius:20px; transition:border-color 0.3s, box-shadow 0.3s; }
+    .input-section.listening { border-color:rgba(239,68,68,0.6); box-shadow:0 0 0 4px rgba(239,68,68,0.15); }
+    .section-label { font-size:15px; font-weight:700; color:rgba(255,255,255,0.55); letter-spacing:1.5px; margin-bottom:20px; }
+
+    .mic-btn { width:100px; height:100px; border-radius:50%; border:none; cursor:pointer; background:linear-gradient(135deg,#3b82f6,#1d4ed8); box-shadow:0 0 0 4px rgba(59,130,246,0.2),0 8px 30px rgba(59,130,246,0.4); display:flex; align-items:center; justify-content:center; margin:0 auto 20px; transition:all 0.3s; }
+    .mic-btn:hover { transform:scale(1.05); }
+    .mic-btn.listening { background:linear-gradient(135deg,#ef4444,#b91c1c); animation:micPulse 1.2s ease-in-out infinite; }
+    .mic-btn svg { width:42px; height:42px; }
+
+    /* 錄音時間提示 */
+    .rec-hint { font-size:13px; font-weight:600; color:rgba(239,68,68,0.8); margin-bottom:8px; min-height:18px; }
+
+    .status-text { font-size:clamp(14px,2.5vw,16px); font-weight:600; color:rgba(255,255,255,0.4); margin-bottom:16px; min-height:22px; transition:color 0.3s; }
+    .status-text.active { color:#fca5a5; }
+
+    .result-wrap { display:flex; justify-content:center; margin-bottom:16px; position:relative; }
+    .result-input { width:80%; padding:16px 46px 16px 20px; font-size:clamp(17px,2.5vw,21px); font-weight:600; background:rgba(255,255,255,0.1); border:2px solid rgba(229,160,13,0.5); border-radius:14px; color:#FFF; outline:none; font-family:inherit; line-height:1.4; transition:all 0.3s; }
+    .result-input::placeholder { color:rgba(255,255,255,0.3); }
+    .result-input:focus { border-color:#E5A00D; box-shadow:0 0 0 4px rgba(229,160,13,0.2); }
+    .result-input.listening { background:rgba(239,68,68,0.08); border-color:rgba(239,68,68,0.5); color:rgba(255,255,255,0.6); }
+    .result-input.has-error { border-color:#ff5555; }
+
+    .clear-btn { position:absolute; right:calc(10% + 12px); top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.15); border:none; border-radius:50%; width:28px; height:28px; cursor:pointer; color:#fff; font-size:18px; display:none; align-items:center; justify-content:center; }
+    .clear-btn.visible { display:flex; }
+    .clear-btn:hover { background:rgba(255,255,255,0.25); }
+
+    .error-msg { color:#ff8a8a; font-size:14px; margin-bottom:12px; font-weight:600; display:none; }
+    .error-msg.visible { display:block; }
+
+    .translate-btn { width:80%; padding:20px 0; font-size:clamp(17px,2.8vw,22px); font-weight:800; letter-spacing:1.5px; color:#FFF; border:none; border-radius:16px; cursor:pointer; transition:all 0.25s; display:inline-flex; align-items:center; justify-content:center; gap:10px; background:linear-gradient(135deg,#FF7A2F,#FF5500); box-shadow:0 6px 24px rgba(255,85,0,0.5); opacity:0.45; }
+    .translate-btn.mode-ja { background:linear-gradient(135deg,#6366f1,#4338ca); box-shadow:0 6px 24px rgba(99,102,241,0.5); }
+    .translate-btn.ready { opacity:1; }
+    .translate-btn.ready:hover { transform:translateY(-2px) scale(1.02); }
+    .translate-btn:disabled { cursor:not-allowed; background:linear-gradient(135deg,#3a3a5c,#2a2a40) !important; opacity:1; box-shadow:none !important; }
+
+    /* 結果卡片 */
+    .result-card { background:rgba(255,255,255,0.04); border:1.5px solid rgba(229,160,13,0.25); border-radius:20px; padding:28px 24px; margin-bottom:28px; }
+    .category-tag { display:inline-block; background:rgba(229,160,13,0.2); border:1px solid rgba(229,160,13,0.5); color:#E5A00D; font-size:13px; font-weight:700; letter-spacing:2px; padding:6px 16px; border-radius:20px; margin-bottom:20px; text-transform:uppercase; }
+    .main-text { font-size:clamp(26px,5.5vw,48px); font-weight:900; color:#FFF; line-height:1.3; margin-bottom:16px; text-shadow:0 2px 20px rgba(229,160,13,0.3); letter-spacing:2px; }
+    .divider { width:60px; height:3px; background:linear-gradient(90deg,transparent,#E5A00D,transparent); margin:0 auto 16px; border-radius:2px; }
+    .sub-text { font-size:clamp(15px,2.8vw,20px); color:#E5A00D; font-style:italic; margin-bottom:10px; letter-spacing:1px; font-family:Georgia,serif; }
+    .meaning-text { font-size:clamp(16px,2.5vw,20px); color:rgba(255,255,255,0.65); font-weight:500; }
+    .fade-in { animation:fadeIn 0.5s ease; }
+
+    .speak-btn { width:80%; padding:22px 0; font-size:clamp(18px,3vw,24px); font-weight:800; letter-spacing:2px; background:linear-gradient(135deg,#E5A00D,#F7C948); color:#1a1a2e; border:none; border-radius:18px; cursor:pointer; box-shadow:0 8px 30px rgba(229,160,13,0.5); transition:all 0.3s; display:inline-flex; align-items:center; justify-content:center; gap:12px; }
+    .speak-btn:hover:not(:disabled) { transform:translateY(-2px) scale(1.02); box-shadow:0 12px 40px rgba(229,160,13,0.7); }
+    .speak-btn:disabled { cursor:not-allowed; background:linear-gradient(135deg,#b07a00,#8a5e00); box-shadow:none; }
+    .speak-btn .spk-icon { font-size:28px; }
+    .speak-btn.playing .spk-icon { animation:speakerWave 0.6s infinite alternate; }
+    .hint-text { margin-top:20px; color:rgba(255,255,255,0.35); font-size:13px; }
+    .spinner { display:inline-block; width:22px; height:22px; border:3px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; }
+
+    @keyframes micPulse { 0%,100%{box-shadow:0 0 0 8px rgba(239,68,68,0.25),0 8px 30px rgba(239,68,68,0.5);}50%{box-shadow:0 0 0 18px rgba(239,68,68,0.08),0 8px 40px rgba(239,68,68,0.6);} }
+    @keyframes speakerWave { 0%{transform:scale(1) rotate(-5deg);}100%{transform:scale(1.2) rotate(5deg);} }
+    @keyframes spin { to{transform:rotate(360deg);} }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <!-- 模式切換 -->
+  <div class="mode-switcher">
+    <button class="mode-btn active-zh" id="btnZhJa" onclick="setMode('zh-ja')">🇹🇼 中文 → 日文</button>
+    <button class="mode-btn" id="btnJaZh" onclick="setMode('ja-zh')">🇯🇵 日文 → 中文</button>
+  </div>
+
+  <!-- 語音輸入區 -->
+  <div class="input-section" id="inputSection">
+    <div class="section-label" id="sectionLabel">🎙️ 請說出您的中文需求</div>
+    <button class="mic-btn" id="micBtn" onclick="toggleListening()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2" width="6" height="11" rx="3"/>
+        <path d="M5 10a7 7 0 0 0 14 0"/>
+        <line x1="12" y1="19" x2="12" y2="22"/>
+        <line x1="8" y1="22" x2="16" y2="22"/>
+      </svg>
+    </button>
+    <div class="rec-hint" id="recHint"></div>
+    <div class="status-text" id="statusText">👆 點上方麥克風按鈕開始說話</div>
+    <div class="result-wrap">
+      <input class="result-input" id="resultInput" type="text"
+        placeholder="語音辨識結果將顯示於此（亦可手動輸入）"
+        oninput="onInputChange()"
+        onkeydown="if(event.key==='Enter') doTranslate()" />
+      <button class="clear-btn" id="clearBtn" onclick="doClear()">×</button>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+    <div style="display:flex;justify-content:center;">
+      <button class="translate-btn" id="translateBtn" onclick="doTranslate()">
+        <span id="translateLabel">中文翻日文</span><span style="font-size:22px">✨</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 結果卡片 -->
+  <div class="result-card">
+    <div class="category-tag" id="categoryTag">🗾 範例句</div>
+    <div class="main-text" id="mainText">たらい舟に乗りたいです</div>
+    <div class="divider"></div>
+    <div class="sub-text" id="subText">Tarai-bune ni noritai desu</div>
+    <div class="meaning-text" id="meaningText">我想搭乘木盆船</div>
+  </div>
+
+  <!-- 發音按鈕 -->
+  <div style="display:flex;justify-content:center;">
+    <button class="speak-btn" id="speakBtn" onclick="doSpeak()">
+      <span class="spk-icon">🔊</span>
+      <span id="speakLabel">點我發音</span>
+    </button>
+  </div>
+  <p class="hint-text">※ 請確認裝置音量已開啟 ｜ 首次使用請允許麥克風權限</p>
+</div>
+
+<script type="importmap">{"imports":{"@google/generative-ai":"https://esm.run/@google/generative-ai"}}</script>
+<script type="module">
+  import { GoogleGenerativeAI } from "@google/generative-ai";
+
+  const genAI = new GoogleGenerativeAI('AIzaSyAShdl2lc8v7P8v1MfqYBcLnzovp3Sdi2Q');
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  /* ═══ 狀態 ═══ */
+  let mode        = 'zh-ja';
+  let isListening = false;
+  let isPlaying   = false;
+  let isLoading   = false;
+  let rec         = null;
+  let timerInterval = null;
+  let recSeconds    = 0;
+
+  /* ═══ DOM ═══ */
+  const $ = id => document.getElementById(id);
+  const inputSection   = $('inputSection');
+  const micBtn         = $('micBtn');
+  const statusText     = $('statusText');
+  const recHint        = $('recHint');
+  const resultInput    = $('resultInput');
+  const clearBtn       = $('clearBtn');
+  const errorMsg       = $('errorMsg');
+  const translateBtn   = $('translateBtn');
+  const translateLabel = $('translateLabel');
+  const speakBtn       = $('speakBtn');
+  const speakLabel     = $('speakLabel');
+
+  /* ═══ 計時器 ═══ */
+  function startTimer() {
+    recSeconds = 0;
+    recHint.textContent = '⏱ 錄音中 0 秒';
+    timerInterval = setInterval(() => {
+      recSeconds++;
+      recHint.textContent = `⏱ 錄音中 ${recSeconds} 秒`;
+    }, 1000);
+  }
+  function stopTimer() {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    recHint.textContent = '';
+  }
+
+  /* ═══ 模式切換 ═══ */
+  window.setMode = (m) => {
+    if (isListening) forceStop();
+    mode = m;
+    doClear();
+    clearErr();
+    const isZhJa = m === 'zh-ja';
+    $('btnZhJa').className = isZhJa ? 'mode-btn active-zh' : 'mode-btn';
+    $('btnJaZh').className = isZhJa ? 'mode-btn' : 'mode-btn active-ja';
+    $('sectionLabel').textContent = isZhJa ? '🎙️ 請說出您的中文需求' : '🎙️ 請說出對方說的日文';
+    resultInput.placeholder = isZhJa
+      ? '語音辨識結果將顯示於此（亦可手動輸入中文）'
+      : '語音辨識結果將顯示於此（亦可手動輸入日文）';
+    translateLabel.textContent = isZhJa ? '中文翻日文' : '日文翻中文';
+    translateBtn.classList.toggle('mode-ja', !isZhJa);
+    $('categoryTag').textContent = isZhJa ? '🗾 範例句'         : '🗾 請輸入日文';
+    $('mainText').textContent    = isZhJa ? 'たらい舟に乗りたいです' : '—';
+    $('subText').textContent     = isZhJa ? 'Tarai-bune ni noritai desu' : '—';
+    $('meaningText').textContent = isZhJa ? '我想搭乘木盆船'    : '中文翻譯將顯示於此';
+  };
+
+  /* ═══ 語音辨識 ═══ */
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    statusText.textContent = '⚠️ 此瀏覽器不支援語音輸入，請使用 Chrome';
+    micBtn.disabled = true; micBtn.style.opacity = '0.4';
+  } else {
+    rec = new SR();
+    rec.interimResults  = true;
+    rec.maxAlternatives = 1;
+    rec.continuous      = true;   // ← 使用 continuous 避免重啟跳授權視窗
+
+    rec.onresult = (e) => {
+      let display = '';
+      for (let i = 0; i < e.results.length; i++) {
+        display += e.results[i][0].transcript;
+      }
+      resultInput.value = display;
+      updateUI();
+    };
+
+    rec.onend = () => {
+      // continuous=true 下 onend 只在 stop() 後觸發
+      if (!isListening) finishListening();
+    };
+
+    rec.onerror = (e) => {
+      if (e.error === 'no-speech') return;
+      if (e.error === 'not-allowed') {
+        forceStop();
+        showErr('麥克風權限被拒絕，請點網址列鎖頭圖示允許後重新整理。');
+      }
+    };
+  }
+
+  function finishListening() {
+    stopTimer();
+    micBtn.classList.remove('listening');
+    inputSection.classList.remove('listening');
+    resultInput.classList.remove('listening');
+    statusText.classList.remove('active');
+    statusText.textContent = resultInput.value.trim()
+      ? '✅ 辨識完成，可按翻譯或重新說話'
+      : '👆 點上方麥克風按鈕開始說話';
+    updateUI();
+  }
+
+  function forceStop() {
+    isListening = false;
+    try { rec && rec.stop(); } catch(e) {}
+    finishListening();
+  }
+
+  window.toggleListening = () => {
+    if (!rec) return;
+    clearErr();
+    if (isListening) {
+      isListening = false;
+      rec.stop();          // onend → finishListening
+    } else {
+      resultInput.value = '';
+      updateUI();
+      rec.lang = mode === 'zh-ja' ? 'zh-TW' : 'ja-JP';
+      try { rec.start(); } catch(e) { showErr('無法啟動麥克風，請重新整理頁面。'); return; }
+      isListening = true;
+      startTimer();
+      micBtn.classList.add('listening');
+      inputSection.classList.add('listening');
+      resultInput.classList.add('listening');
+      statusText.classList.add('active');
+      statusText.textContent = '🔴 聆聽中，說完請再按一次停止';
+    }
+  };
+
+  /* ═══ 輔助 ═══ */
+  window.onInputChange = () => { clearErr(); updateUI(); };
+  window.doClear = () => {
+    resultInput.value = '';
+    updateUI();
+    statusText.textContent = '👆 點上方麥克風按鈕開始說話';
+  };
+  function updateUI() {
+    const has = resultInput.value.trim().length > 0;
+    clearBtn.classList.toggle('visible', has && !isListening);
+    translateBtn.classList.toggle('ready', has);
+  }
+  function showErr(msg) { errorMsg.textContent = '⚠️ ' + msg; errorMsg.classList.add('visible'); resultInput.classList.add('has-error'); }
+  function clearErr() { errorMsg.classList.remove('visible'); resultInput.classList.remove('has-error'); }
+  function animateResults() {
+    ['categoryTag','mainText','subText','meaningText'].forEach(id => {
+      const el = $(id);
+      el.classList.remove('fade-in');
+      void el.offsetWidth;
+      el.classList.add('fade-in');
+    });
+  }
+
+  /* ═══ AI 翻譯 ═══ */
+  window.doTranslate = async () => {
+    const text = resultInput.value.trim();
+    const isZhJa = mode === 'zh-ja';
+    if (!text) { showErr(isZhJa ? '請先說出或輸入中文！' : '請先說出或輸入日文！'); return; }
+    if (isLoading) return;
+
+    clearErr();
+    isLoading = true;
+    translateBtn.disabled = true;
+    translateBtn.innerHTML = '<span class="spinner"></span><span style="margin-left:10px">翻譯中，請稍候…</span>';
+
+    try {
+      const prompt = isZhJa
+        ? `你是專業中日翻譯老師，幫台灣長輩在日本旅遊溝通。將以下中文翻譯成日文，只回傳純 JSON，不加 markdown：{"japanese":"日文（平假名+漢字）","romaji":"Hepburn羅馬拼音","meaning":"${text}","category":"場景分類（購物/餐廳/交通/住宿/緊急/觀光）"} 中文：${text}`
+        : `你是專業日中翻譯老師，幫台灣長輩在日本旅遊理解日文。將以下日文翻譯成繁體中文，只回傳純 JSON，不加 markdown：{"japanese":"${text}","romaji":"Hepburn羅馬拼音","chinese":"繁體中文翻譯","category":"場景分類（購物/餐廳/交通/住宿/緊急/觀光）"} 日文：${text}`;
+
+      const result = await model.generateContent(prompt);
+      const parsed = JSON.parse(result.response.text().replace(/```json|```/g,'').trim());
+
+      $('categoryTag').textContent = '🗾 ' + parsed.category;
+      $('mainText').textContent    = parsed.japanese;
+      $('subText').textContent     = parsed.romaji;
+      $('meaningText').textContent = isZhJa ? parsed.meaning : '📖 ' + parsed.chinese;
+      animateResults();
+
+    } catch(e) {
+      showErr('翻譯失敗：' + (e.message || '請確認網路後再試。'));
+    } finally {
+      isLoading = false;
+      translateBtn.disabled = false;
+      translateBtn.innerHTML = `<span>${mode === 'zh-ja' ? '中文翻日文' : '日文翻中文'}</span><span style="font-size:22px">✨</span>`;
+      translateBtn.classList.toggle('ready', resultInput.value.trim().length > 0);
+      // ← 翻譯完成後【不】自動開麥克風
+    }
+  };
+
+  /* ═══ 發音 ═══ */
+  window.doSpeak = () => {
+    const text = $('mainText').textContent;
+    if (isPlaying || text === '—') return;
+    isPlaying = true;
+    speakBtn.disabled = true;
+    speakBtn.classList.add('playing');
+    speakLabel.textContent = '播放中...';
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ja-JP'; u.rate = 0.85; u.pitch = 1.1;
+    u.onend = u.onerror = () => {
+      isPlaying = false;
+      speakBtn.disabled = false;
+      speakBtn.classList.remove('playing');
+      speakLabel.textContent = '點我發音';
+    };
+    window.speechSynthesis.speak(u);
+  };
+</script>
+</body>
+</html>
