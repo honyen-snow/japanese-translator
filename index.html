@@ -329,9 +329,23 @@
       const parsed = JSON.parse(result.response.text().replace(/```json|```/g,'').trim());
 
       $('categoryTag').textContent = '🗾 ' + parsed.category;
-      $('mainText').textContent    = parsed.japanese;
-      $('subText').textContent     = parsed.romaji;
-      $('meaningText').textContent = isZhJa ? parsed.meaning : '📖 ' + parsed.chinese;
+      if (isZhJa) {
+        // 中翻日：大字=日文，小字=羅馬拼音，底部=中文
+        $('mainText').textContent   = parsed.japanese;
+        $('subText').textContent    = parsed.romaji;
+        $('meaningText').textContent = parsed.meaning;
+        speakLabel.textContent      = '🔊 點我發音（日文）';
+        $('speakBtn').dataset.speakText = parsed.japanese;
+        $('speakBtn').dataset.speakLang = 'ja-JP';
+      } else {
+        // 日翻中：大字=中文，小字=原日文，底部=羅馬拼音
+        $('mainText').textContent    = parsed.chinese;
+        $('subText').textContent     = parsed.japanese;
+        $('meaningText').textContent = '🔤 ' + parsed.romaji;
+        speakLabel.textContent       = '🔊 點我發音（日文）';
+        $('speakBtn').dataset.speakText = parsed.japanese;
+        $('speakBtn').dataset.speakLang = 'ja-JP';
+      }
       animateResults();
 
     } catch(e) {
@@ -347,19 +361,22 @@
 
   /* ═══ 發音 ═══ */
   window.doSpeak = () => {
-    const text = $('mainText').textContent;
-    if (isPlaying || text === '—') return;
+    // 永遠取日文來發音（存在 dataset 裡）
+    const speakText = $('speakBtn').dataset.speakText || $('mainText').textContent;
+    const speakLang = $('speakBtn').dataset.speakLang || 'ja-JP';
+    if (isPlaying || speakText === '—') return;
     isPlaying = true;
     speakBtn.disabled = true;
     speakBtn.classList.add('playing');
+    const origLabel = speakLabel.textContent;
     speakLabel.textContent = '播放中...';
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ja-JP'; u.rate = 0.85; u.pitch = 1.1;
+    const u = new SpeechSynthesisUtterance(speakText);
+    u.lang = speakLang; u.rate = 0.85; u.pitch = 1.1;
     u.onend = u.onerror = () => {
       isPlaying = false;
       speakBtn.disabled = false;
       speakBtn.classList.remove('playing');
-      speakLabel.textContent = '點我發音';
+      speakLabel.textContent = origLabel;
     };
     window.speechSynthesis.speak(u);
   };
